@@ -1,0 +1,24 @@
+services:
+  backend:
+    image: docker-server-app
+    build: ./Server
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./Server:/app
+      - /app/node_modules
+    command: npx nodemon -L src/server.js
+    restart: unless-stopped
+
+  frontend:
+    image: docker-client-app
+    build: ./FrontEnd
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./FrontEnd:/app
+      - /app/node_modules
+    command: npm run start -- --host 0.0.0.0
+    restart: unless-stopped
+    depends_on:
+      - backend
