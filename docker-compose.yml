@@ -4,7 +4,6 @@ services:
     container_name: lesson67-mongo
     ports:
       - "27017:27017"
-    command: ["mongodb", "--quiet", "--logpath", "/dev/null"]
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password123
