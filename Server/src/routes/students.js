@@ -1,42 +1,56 @@
 import { Router } from "express";
-
-import { v4 as uuidv4 } from "uuid";
+import { ObjectId } from "mongodb";
+import database from "../config/database.js";
 
 const router = Router();
 
-let students = [];
+router.get("/", async (req, res) => {
+  const students = await database.getCollection('students').find({}).toArray();
+  res.json(students);
+});
 
-// CRUD for students
-router.get("/", (req, res) => res.json(students));
-
-router.get("/:id", (req, res) => {
-  const student = students.find(s => s.id === req.params.id);
+router.get("/:id", async (req, res) => {
+  const student = await database.getCollection('students').findOne({ _id: new ObjectId(req.params.id) });
   if (!student) return res.status(404).json({ error: "Student not found" });
   res.json(student);
 });
 
-router.post("/", (req, res) => {
-  const { fullname, city } = req.body;
-  const newStudent = {
-    id: uuidv4(),
-    fullname,
-    city,
+router.post("/", async (req, res) => {
+  const { fullname, city, email, age } = req.body;
+  const newStudent = { 
+    fullname, 
+    city, 
+    email, 
+    age: age ? parseInt(age) : undefined,
+    createdAt: new Date()
   };
-  students.push(newStudent);
-  res.status(201).json(newStudent);
+  const result = await database.getCollection('students').insertOne(newStudent);
+  const createdStudent = await database.getCollection('students').findOne({ _id: result.insertedId });
+  res.status(201).json(createdStudent);
 });
 
-router.put("/:id", (req, res) => {
-  const student = students.find(s => s.id === req.params.id);
-  if (!student) return res.status(404).json({ error: "Student not found" });
-
-  student.fullname = req.body.fullname || student.fullname;
-  student.city = req.body.city || student.city;
-  res.json(student);
+router.put("/:id", async (req, res) => {
+  const updateData = {};
+  if (req.body.fullname) updateData.fullname = req.body.fullname;
+  if (req.body.city) updateData.city = req.body.city;
+  if (req.body.email) updateData.email = req.body.email;
+  if (req.body.age) updateData.age = parseInt(req.body.age);
+  updateData.updatedAt = new Date();
+  
+  const result = await database.getCollection('students').updateOne(
+    { _id: new ObjectId(req.params.id) },
+    { $set: updateData }
+  );
+  
+  if (result.matchedCount === 0) return res.status(404).json({ error: "Student not found" });
+  
+  const updatedStudent = await database.getCollection('students').findOne({ _id: new ObjectId(req.params.id) });
+  res.json(updatedStudent);
 });
 
-router.delete("/:id", (req, res) => {
-  students = students.filter(s => s.id !== req.params.id);
+router.delete("/:id", async (req, res) => {
+  const result = await database.getCollection('students').deleteOne({ _id: new ObjectId(req.params.id) });
+  if (result.deletedCount === 0) return res.status(404).json({ error: "Student not found" });
   res.status(204).send();
 });
 

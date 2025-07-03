@@ -1,58 +1,75 @@
 import { Router } from "express";
-import { v4 as uuidv4 } from "uuid";
+import { ObjectId } from "mongodb";
+import database from "../config/database.js";
 
 const router = Router();
 
-let courses = [];
-
-router.get("/", (req, res) => {
+router.get("/", async (req, res) => {
+  const courses = await database.getCollection('courses').find({}).toArray();
   res.json(courses);
 });
 
-router.get("/:id", (req, res) => {
-  const course = courses.find((c) => c.id === req.params.id);
+router.get("/:id", async (req, res) => {
+  const course = await database.getCollection('courses').findOne({ _id: new ObjectId(req.params.id) });
   if (!course) return res.status(404).json({ error: "Course not found" });
   res.json(course);
 });
 
-router.post("/", (req, res) => {
-  const { name, description, startDate } = req.body;
+router.post("/", async (req, res) => {
+  const { name, description, startDate, duration, instructor, maxStudents } = req.body;
   const newCourse = {
-    id: uuidv4(),
     name,
     description,
     startDate,
+    duration,
+    instructor,
+    maxStudents: maxStudents ? parseInt(maxStudents) : 30,
     students: [],
+    createdAt: new Date()
   };
-  courses.push(newCourse);
-  res.status(201).json(newCourse);
+  const result = await database.getCollection('courses').insertOne(newCourse);
+  const createdCourse = await database.getCollection('courses').findOne({ _id: result.insertedId });
+  res.status(201).json(createdCourse);
 });
 
-router.put('/assign-student/:courseId', (req, res) => {
-  const course = courses.find((c) => c.id === req.params.courseId);
-  if (!course) return res.status(404).json({ error: "Course not found" });
-
+router.put('/assign-student/:courseId', async (req, res) => {
   const newStudentId = req.body.studentId;
-  if (!newStudentId) {
-    return res.status(400).json({error: 'bad request'});
-  }
-
-  course.students.push(newStudentId);
-  res.json(course);
-})
-
-router.put("/:id", (req, res) => {
-  const course = courses.find((c) => c.id === req.params.id);
-  if (!course) return res.status(404).json({ error: "Course not found" });
-
-  course.name = req.body.name || course.name;
-  course.description = req.body.description || course.description;
-  course.startDate = req.body.startDate || course.startDate;
-  res.json(course);
+  
+  const result = await database.getCollection('courses').updateOne(
+    { _id: new ObjectId(req.params.courseId) },
+    { $push: { students: newStudentId } }
+  );
+  
+  if (result.matchedCount === 0) return res.status(404).json({ error: "Course not found" });
+  
+  const updatedCourse = await database.getCollection('courses').findOne({ _id: new ObjectId(req.params.courseId) });
+  res.json(updatedCourse);
 });
 
-router.delete("/:id", (req, res) => {
-  courses = courses.filter((c) => c.id !== req.params.id);
+router.put("/:id", async (req, res) => {
+  const updateData = {};
+  if (req.body.name) updateData.name = req.body.name;
+  if (req.body.description) updateData.description = req.body.description;
+  if (req.body.startDate) updateData.startDate = req.body.startDate;
+  if (req.body.duration) updateData.duration = req.body.duration;
+  if (req.body.instructor) updateData.instructor = req.body.instructor;
+  if (req.body.maxStudents) updateData.maxStudents = parseInt(req.body.maxStudents);
+  updateData.updatedAt = new Date();
+  
+  const result = await database.getCollection('courses').updateOne(
+    { _id: new ObjectId(req.params.id) },
+    { $set: updateData }
+  );
+  
+  if (result.matchedCount === 0) return res.status(404).json({ error: "Course not found" });
+  
+  const updatedCourse = await database.getCollection('courses').findOne({ _id: new ObjectId(req.params.id) });
+  res.json(updatedCourse);
+});
+
+router.delete("/:id", async (req, res) => {
+  const result = await database.getCollection('courses').deleteOne({ _id: new ObjectId(req.params.id) });
+  if (result.deletedCount === 0) return res.status(404).json({ error: "Course not found" });
   res.status(204).send();
 });
 

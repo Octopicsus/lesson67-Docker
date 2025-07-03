@@ -1,4 +1,18 @@
 services:
+  mongodb:
+    image: mongo:latest
+    container_name: lesson67-mongo
+    ports:
+      - "27017:27017"
+    command: ["mongodb", "--quiet", "--logpath", "/dev/null"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: lesson67
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+
   backend:
     image: docker-server-app
     build: ./Server
@@ -8,7 +22,11 @@ services:
       - ./Server:/app
       - /app/node_modules
     command: npx nodemon -L src/server.js
+    environment:
+      - MONGO_URI=mongodb://admin:password123@mongodb:27017/lesson67?authSource=admin
     restart: unless-stopped
+    depends_on:
+      - mongodb
 
   frontend:
     image: docker-client-app
@@ -22,3 +40,6 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+
+volumes:
+  mongodb_data:
